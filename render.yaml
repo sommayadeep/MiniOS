@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: minios
+    runtime: docker
+    plan: starter
+    healthCheckPath: /

@@ -15,7 +15,7 @@ import threading
 import time
 from urllib.parse import urlparse
 
-PORT = 5050
+PORT = int(os.environ.get("PORT", "5050"))
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BINARY_PATH = os.path.join(PROJECT_ROOT, "minios.exe" if os.name == "nt" else "minios")
 
@@ -209,7 +209,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def run():
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), RequestHandler)
+    server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), RequestHandler)
     print("=" * 60)
     print(f"🚀 MiniOS Web UI running at: http://127.0.0.1:{PORT}")
     print("Open the URL in your browser to test MiniOS.")

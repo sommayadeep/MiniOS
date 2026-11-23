@@ -56,6 +56,10 @@ python3 ui/app.py
 ```
 Then open your browser at: **[http://127.0.0.1:5050](http://127.0.0.1:5050)**
 
+## Deploy for Public Use
+
+The repository includes a Dockerfile and Render Blueprint for an always-on Render web service. In Render, create a Blueprint from this repository and apply `render.yaml`; the `starter` plan is paid and does not spin down. Render will assign a public `onrender.com` URL. See [Render's compute plans](https://render.com/docs/compute-plans) for current pricing.
+
 ## Project Structure
 
 ```
