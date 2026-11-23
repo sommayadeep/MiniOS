@@ -1,9 +1,4 @@
+node_modules
+dist
 .git
-.DS_Store
-minios
-minios.exe
-*.o
-*.out
-__pycache__
-*.pdf
-*.pptx
+*.tsbuildinfo

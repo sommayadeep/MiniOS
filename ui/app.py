@@ -135,7 +135,9 @@ session = MiniOSSession()
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        ui_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        dist_dir = os.path.join(project_dir, "dist")
+        ui_dir = dist_dir if os.path.isdir(dist_dir) else os.path.dirname(os.path.abspath(__file__))
         super().__init__(*args, directory=ui_dir, **kwargs)
 
     def log_message(self, format, *args):

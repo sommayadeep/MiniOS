@@ -57,7 +57,7 @@ The repository includes an optional GitHub Actions workflow at `.github/workflow
 
 ## Deployment
 
-The web service runs in Docker. The repository includes a `Dockerfile`, `render.yaml`, and an optional Render keep-alive workflow. The current live instance is hosted on Render’s free plan; free instances can spin down after inactivity. See [Render pricing](https://render.com/pricing) for current plan details.
+The web service runs in Docker. The image builds the React frontend with Vite, then runs the existing Python server and C simulator. Render uses `render.yaml` and the Dockerfile. For manual Render setup, select **Docker** as the runtime; no separate Build Command or Start Command is needed because both are defined in the Dockerfile. The server listens on Render’s `PORT` environment variable and serves the generated `dist/` assets. The current live instance may still be running the previous frontend until a new deployment is triggered.
 
 For an Oracle Cloud Always Free VM deployment, see [ORACLE_DEPLOY.md](ORACLE_DEPLOY.md). Confirm the eligibility and cost of selected resources in your cloud account before provisioning.
 
@@ -66,7 +66,9 @@ For an Oracle Cloud Always Free VM deployment, see [ORACLE_DEPLOY.md](ORACLE_DEP
 ```text
 include/    C module interfaces
 src/        OS simulation and command-line implementation
-ui/         Python HTTP server and browser dashboard
+ui/         Python HTTP server and legacy browser dashboard
+src/        React, TypeScript, modules, shared state, and simulator UI
+package.json Vite scripts and frontend dependencies
 docs/       Project report
 Dockerfile  Container build configuration
 render.yaml Render Blueprint configuration
@@ -76,7 +78,7 @@ render.yaml Render Blueprint configuration
 
 - **Core:** C99
 - **Web server:** Python standard library (`http.server`)
-- **Frontend:** HTML, CSS, and JavaScript
+- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Zustand, React Flow
 - **Deployment:** Docker and Render
 
 ## Author

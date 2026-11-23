@@ -1,260 +1,149 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiniOS - Operating System Simulator</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101518">
+  <meta name="description" content="MiniOS is an interactive operating systems simulator for exploring scheduling, memory, synchronization, paging, and disk algorithms.">
+  <title>MiniOS — Operating Systems Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
-  <!-- Top Navigation Bar -->
-  <header class="navbar">
-    <div class="nav-left">
-      <span class="nav-tag">CSE302</span>
-      <div>
-        <h1 class="nav-title">MiniOS Simulator</h1>
-        <p class="nav-subtitle">Operating System Concepts Lab Project</p>
-      </div>
-    </div>
-    <div class="nav-right">
-      <span class="status-badge" id="statusBadge">Status: Ready</span>
-      <button class="btn btn-primary" id="fullDemoBtn" onclick="toggleFullDemo()">Run Full Demo</button>
-      <button class="btn btn-secondary" onclick="resetSession()">Restart OS</button>
-      <button class="btn btn-secondary" onclick="clearTerminal()">Clear</button>
-      <a href="https://github.com/sommayadeep/MiniOS" target="_blank" class="btn btn-outline">GitHub</a>
+  <div class="boot-screen" id="bootScreen" aria-live="polite">
+    <div class="boot-mark" aria-hidden="true">M</div>
+    <div class="boot-copy"><span class="eyebrow">CSE302 / OPERATING SYSTEMS LAB</span><strong>Booting MiniOS</strong><span id="bootMessage">Connecting to the simulator…</span></div>
+    <div class="boot-track"><span></span></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#processes" aria-label="MiniOS home" data-nav="processes">
+      <span class="brand-mark" aria-hidden="true">M</span>
+      <span class="brand-copy"><strong>MiniOS</strong><small>OPERATING SYSTEMS LAB</small></span>
+    </a>
+    <span class="course-tag">CSE302 <i></i> LAB 04</span>
+    <div class="topbar-right">
+      <span class="status-pill" id="statusBadge"><i class="status-light"></i><span>Status: Ready</span></span>
+      <button class="button button-primary top-action" id="fullDemoBtn" onclick="toggleFullDemo()">Run Full Demo <kbd>⌘↵</kbd></button>
+      <button class="icon-button" onclick="resetSession()" aria-label="Restart MiniOS" title="Restart OS">↻</button>
+      <button class="icon-button" id="themeToggle" aria-label="Switch color theme" title="Switch theme">◐</button>
+      <a class="icon-button" href="https://github.com/sommayadeep/MiniOS" target="_blank" rel="noreferrer" aria-label="Open MiniOS on GitHub" title="GitHub">↗</a>
+      <button class="palette-trigger" id="paletteTrigger" aria-label="Open command palette">⌕ <span>Jump to…</span><kbd>⌘K</kbd></button>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="main-container">
-    <!-- Left Column: Module Controls -->
-    <section class="controls-panel">
+  <div class="app-shell">
+    <nav class="module-rail" aria-label="Simulator modules">
+      <span class="rail-label">MODULES</span>
+      <button class="rail-item is-active" data-nav="processes" title="Process management" aria-label="Process management" aria-current="page"><span class="rail-icon">▦</span><span class="rail-tip">Processes</span></button>
+      <button class="rail-item" data-nav="cpu" title="CPU scheduling" aria-label="CPU scheduling"><span class="rail-icon">⌁</span><span class="rail-tip">CPU scheduler</span></button>
+      <button class="rail-item" data-nav="memory" title="Memory management" aria-label="Memory management"><span class="rail-icon">▤</span><span class="rail-tip">Memory</span></button>
+      <button class="rail-item" data-nav="sync" title="Synchronization and deadlock" aria-label="Synchronization and deadlock"><span class="rail-icon">⇄</span><span class="rail-tip">Synchronization</span></button>
+      <button class="rail-item" data-nav="paging" title="Page replacement" aria-label="Page replacement"><span class="rail-icon">▥</span><span class="rail-tip">Virtual memory</span></button>
+      <button class="rail-item" data-nav="disk" title="Disk scheduling" aria-label="Disk scheduling"><span class="rail-icon">◉</span><span class="rail-tip">Disk I/O</span></button>
+      <span class="rail-spacer"></span>
+      <button class="rail-item help-shortcut" id="helpTrigger" title="Keyboard shortcuts" aria-label="Keyboard shortcuts"><span class="rail-icon">?</span><span class="rail-tip">Keyboard help</span></button>
+    </nav>
 
-      <!-- Module 1: Process Management -->
-      <div class="card">
-        <div class="card-header" onclick="toggleCard(this)">
-          <h2>Process Management</h2>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="card-body">
-          <div class="form-row-grid">
-            <div class="form-group">
-              <label>Name</label>
-              <input type="text" id="procName" value="P1" placeholder="P1">
-            </div>
-            <div class="form-group">
-              <label>Burst</label>
-              <input type="number" id="procBurst" value="5" min="1" placeholder="ms">
-            </div>
-            <div class="form-group">
-              <label>Priority</label>
-              <input type="number" id="procPriority" value="2" min="1" placeholder="1-5">
-            </div>
-            <div class="form-group">
-              <label>Arrival</label>
-              <input type="number" id="procArrival" value="0" min="0" placeholder="ms">
-            </div>
-          </div>
-          <div class="btn-group mt-2">
-            <button class="btn btn-primary" onclick="createProcess()">Add Process</button>
-            <button class="btn btn-secondary" onclick="loadSampleProcesses()">Load Sample Jobs (P1-P5)</button>
-            <button class="btn btn-outline" onclick="runCommand('list')">List Processes</button>
-            <button class="btn btn-danger-outline" onclick="runCommand('clear_all')">Clear All</button>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="form-inline">
-            <label>Terminate by PID:</label>
-            <input type="number" id="killPid" value="0" min="0" style="width: 70px;">
-            <button class="btn btn-danger btn-sm" onclick="killProcess()">Kill</button>
-          </div>
-        </div>
+    <main class="workspace" id="workspace">
+      <div class="workspace-heading">
+        <div><span class="eyebrow" id="moduleEyebrow">SYSTEM / PROCESS TABLE</span><h1 id="moduleTitle">Process management</h1><p id="moduleDescription">Create processes and watch their state move through the system.</p></div>
+        <div class="heading-meta"><span class="live-dot"></span><span>LOCAL SIMULATION</span><span class="meta-divider"></span><span id="clockReadout">--:--:--</span></div>
       </div>
 
-      <!-- Module 2: CPU Scheduling -->
-      <div class="card">
-        <div class="card-header" onclick="toggleCard(this)">
-          <h2>CPU Scheduling Algorithms</h2>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="card-body">
-          <p class="section-desc">Run scheduling simulations with Gantt chart generation:</p>
-          <div class="grid-buttons">
-            <button class="btn btn-module" onclick="runCommand('schedule fcfs')">
-              <strong>FCFS</strong>
-              <small>First-Come, First-Served</small>
-            </button>
-            <button class="btn btn-module" onclick="runCommand('schedule sjf')">
-              <strong>SJF</strong>
-              <small>Shortest Job First</small>
-            </button>
-            <button class="btn btn-module" onclick="runCommand('schedule priority')">
-              <strong>Priority</strong>
-              <small>Non-preemptive priority</small>
-            </button>
-            <button class="btn btn-module" onclick="runCommand('schedule mlfq')">
-              <strong>MLFQ</strong>
-              <small>3-Level Feedback Queue</small>
-            </button>
-          </div>
+      <div class="stage-layout">
+        <section class="module-stage" aria-live="polite">
+          <article class="module-view is-visible" id="view-processes" data-view="processes">
+            <div class="control-panel">
+              <div class="panel-heading"><div><span class="eyebrow">01 / PROCESS TABLE</span><h2>Create a process</h2></div><span class="panel-index">PCB</span></div>
+              <p class="panel-note">A process enters the ready state when it is created.</p>
+              <div class="field-grid four-fields">
+                <div class="field"><label for="procName">Name</label><input type="text" id="procName" value="P1" placeholder="P1" autocomplete="off"></div>
+                <div class="field"><label for="procBurst">Burst <small>ms</small></label><input type="number" id="procBurst" value="5" min="1" placeholder="5"></div>
+                <div class="field"><label for="procPriority">Priority <small>1–5</small></label><input type="number" id="procPriority" value="2" min="1" max="5" placeholder="2"></div>
+                <div class="field"><label for="procArrival">Arrival <small>ms</small></label><input type="number" id="procArrival" value="0" min="0" placeholder="0"></div>
+              </div>
+              <div class="action-row"><button class="button button-primary" onclick="createProcess()">＋ Add process</button><button class="button button-secondary" onclick="loadSampleProcesses()">Load sample jobs</button></div>
+              <div class="field-divider"></div>
+              <div class="inline-control"><label for="killPid">Terminate PID</label><input type="number" id="killPid" value="0" min="0"><button class="button button-danger-quiet" onclick="killProcess()">Kill process</button></div>
+              <div class="action-row quiet-actions"><button class="text-button" onclick="runCommand('list')">Refresh process list</button><button class="text-button danger-text" onclick="runCommand('clear_all')">Clear all</button></div>
+            </div>
+            <div class="visual-panel process-visual">
+              <div class="visual-header"><div><span class="eyebrow">LIVE STATE</span><h2>Process activity</h2></div><span class="visual-tag"><i></i> SCHEDULER READY</span></div>
+              <div class="empty-state" id="processEmpty"><div class="empty-diagram" aria-hidden="true"><span class="empty-node">NEW</span><span class="empty-arrow">→</span><span class="empty-node ready-node">READY</span><span class="empty-arrow">→</span><span class="empty-node">RUN</span></div><strong>No processes yet</strong><p>Load the sample jobs to start exploring scheduler behavior.</p><button class="button button-secondary" onclick="loadSampleProcesses()">Load P1–P5</button></div>
+              <div class="activity-list" id="processActivity" hidden></div>
+              <div class="metrics-strip" id="processMetrics"><div class="metric"><span>PROCESSES</span><strong id="metricProcessCount">00</strong></div><div class="metric"><span>READY</span><strong id="metricReadyCount">00</strong></div><div class="metric"><span>RUNNING</span><strong id="metricRunningCount">00</strong></div><div class="metric"><span>ALLOCATED</span><strong id="processAllocated">0 <small>MB</small></strong></div></div>
+            </div>
+          </article>
 
-          <div class="form-inline mt-3">
-            <label>Round Robin (Quantum):</label>
-            <input type="number" id="rrQuantum" value="2" min="1" style="width: 60px;">
-            <button class="btn btn-secondary btn-sm" onclick="runRR()">Run RR</button>
-          </div>
+          <article class="module-view" id="view-cpu" data-view="cpu" hidden>
+            <div class="control-panel compact-controls">
+              <div class="panel-heading"><div><span class="eyebrow">02 / CPU SCHEDULER</span><h2>Choose a policy</h2></div><span class="panel-index">CPU</span></div>
+              <p class="panel-note">Dispatch ready processes to the CPU and compare their wait.</p>
+              <div class="algorithm-list">
+                <button class="algorithm-button" onclick="runCommand('schedule fcfs')"><span class="algo-code">01</span><span><strong>FCFS</strong><small>First come, first served</small></span><span class="algo-arrow">↗</span></button>
+                <button class="algorithm-button" onclick="runCommand('schedule sjf')"><span class="algo-code">02</span><span><strong>SJF</strong><small>Shortest job first</small></span><span class="algo-arrow">↗</span></button>
+                <button class="algorithm-button" onclick="runCommand('schedule priority')"><span class="algo-code">03</span><span><strong>Priority</strong><small>Non-preemptive</small></span><span class="algo-arrow">↗</span></button>
+                <button class="algorithm-button" onclick="runCommand('schedule mlfq')"><span class="algo-code">04</span><span><strong>MLFQ</strong><small>Three feedback queues</small></span><span class="algo-arrow">↗</span></button>
+              </div>
+              <div class="field-divider"></div>
+              <div class="field rr-field"><label for="rrQuantum">Round Robin quantum</label><div class="field-with-action"><input type="number" id="rrQuantum" value="2" min="1"><button class="button button-secondary" onclick="runRR()">Run RR</button></div><small>Each process receives this many milliseconds per turn.</small></div>
+              <button class="button button-accent-outline full-width" onclick="runCommand('schedule compare')">Compare all algorithms <span>→</span></button>
+              <p class="hint-line" id="cpuHint">Add at least one process to enable a schedule.</p>
+            </div>
+            <div class="visual-column">
+              <div class="visual-panel gantt-panel"><div class="visual-header"><div><span class="eyebrow">EXECUTION TIMELINE</span><h2 id="ganttTitle">CPU Gantt chart</h2></div><span class="visual-tag"><i></i> <span id="scheduleState">AWAITING SCHEDULE</span></span></div><div class="gantt-viewport" id="ganttChart" role="img" aria-label="CPU Gantt chart. Run a scheduling algorithm to visualize process execution."><div class="chart-empty"><span class="chart-empty-mark">▰</span><span>Run a scheduler to draw its execution timeline.</span></div></div><div class="playback-bar"><div class="playback-controls"><button class="play-button" id="playSchedule" aria-label="Play schedule" title="Play">▶</button><button class="step-button" id="stepSchedule" aria-label="Step schedule" title="Step">▸|</button><span class="playback-label" id="playbackLabel">0 / 0 steps</span></div><label class="speed-control">SPEED <select id="playbackSpeed" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label></div></div>
+              <div class="result-strip" id="cpuResults"><div class="result-placeholder">SCHEDULING METRICS <span>Results appear after a run.</span></div></div>
+            </div>
+          </article>
 
-          <div class="mt-3">
-            <button class="btn btn-success w-100" onclick="runCommand('schedule compare')">
-              Compare All Algorithms Side-by-Side
-            </button>
-          </div>
-        </div>
+          <article class="module-view" id="view-memory" data-view="memory" hidden>
+            <div class="control-panel compact-controls">
+              <div class="panel-heading"><div><span class="eyebrow">03 / MEMORY MANAGER</span><h2>Allocate a block</h2></div><span class="panel-index">1024 MB</span></div>
+              <p class="panel-note">Choose a process and placement policy for the memory arena.</p>
+              <div class="field"><label for="memProcName">Process name</label><input type="text" id="memProcName" value="P1"></div>
+              <div class="field"><label for="memSize">Requested size <small>MB</small></label><input type="number" id="memSize" value="128" min="1" max="1024"></div>
+              <div class="field"><label for="memPolicy">Placement policy</label><select id="memPolicy"><option value="ff">First Fit — first available hole</option><option value="bf">Best Fit — smallest suitable hole</option><option value="wf">Worst Fit — largest suitable hole</option></select></div>
+              <div class="action-row"><button class="button button-primary" onclick="allocMemory()">Allocate</button><button class="button button-secondary" onclick="freeMemory()">Free block</button></div>
+              <div class="action-row"><button class="text-button" onclick="runCommand('mem_status')">Refresh map</button><button class="text-button danger-text" onclick="runCommand('mem_reset')">Reset arena</button></div>
+              <div class="field-divider"></div><p class="hint-line">Adjacent free blocks are coalesced when memory is released.</p>
+            </div>
+            <div class="visual-column"><div class="visual-panel memory-panel"><div class="visual-header"><div><span class="eyebrow">PHYSICAL MEMORY / 0–1024 MB</span><h2>Memory arena</h2></div><span class="visual-tag" id="memoryUsageTag">0% IN USE</span></div><div class="memory-ruler"><span>0 MB</span><span>256</span><span>512</span><span>768</span><span>1024 MB</span></div><div class="memory-bar" id="memoryBar" role="img" aria-label="Memory arena visualization"><button class="memory-segment free-segment" style="width:100%" title="Free: 1024 MB"><span>FREE / 1024 MB</span></button></div><div class="memory-legend" id="memoryLegend"><span><i class="legend-free"></i>Free space</span></div><div class="metrics-strip memory-metrics"><div class="metric"><span>ALLOCATED</span><strong id="memoryAllocated">0 <small>MB</small></strong></div><div class="metric"><span>FREE</span><strong id="memoryFree">1024 <small>MB</small></strong></div><div class="metric"><span>FRAGMENTATION</span><strong id="memoryFragmentation">0<small>%</small></strong></div></div></div><div class="result-strip" id="memoryResult"><div class="result-placeholder">PLACEMENT RESULT <span>Allocation details appear here.</span></div></div></div>
+          </article>
+
+          <article class="module-view" id="view-sync" data-view="sync" hidden>
+            <div class="control-panel compact-controls"><div class="panel-heading"><div><span class="eyebrow">04 / CONCURRENCY</span><h2>Choose a scenario</h2></div><span class="panel-index">SYNC</span></div><p class="panel-note">Observe how shared resources coordinate access and avoid deadlock.</p><button class="scenario-card" onclick="runCommand('producer_consumer')"><span class="scenario-icon">⇄</span><strong>Producer–Consumer</strong><small>Bounded buffer · semaphores</small><span class="scenario-run">Run scenario →</span></button><button class="scenario-card" onclick="runBankers()"><span class="scenario-icon">⊞</span><strong>Banker’s Algorithm</strong><small>Resource allocation · safety check</small><span class="scenario-run">Check safety →</span></button><div class="field-divider"></div><p class="hint-line">The safe sequence and semaphore state are summarized in the visualization.</p></div>
+            <div class="visual-column"><div class="visual-panel sync-panel"><div class="visual-header"><div><span class="eyebrow">SHARED RESOURCE STATE</span><h2 id="syncTitle">Concurrency workbench</h2></div><span class="visual-tag" id="syncStatus">READY</span></div><div id="syncVisual" class="sync-visual"><div class="sync-empty"><div class="sync-flow"><span>PRODUCER</span><b>→</b><span class="buffer-slot">□</span><span class="buffer-slot">□</span><span class="buffer-slot">□</span><b>→</b><span>CONSUMER</span></div><p>Run a scenario to see resource flow and process safety.</p></div></div><div class="sync-metrics" id="syncMetrics"><div><span>EMPTY</span><strong>—</strong></div><div><span>FULL</span><strong>—</strong></div><div><span>MUTEX</span><strong>—</strong></div></div></div><div class="result-strip" id="syncResult"><div class="result-placeholder">SIMULATION RESULT <span>Run a concurrency scenario.</span></div></div></div>
+          </article>
+
+          <article class="module-view" id="view-paging" data-view="paging" hidden>
+            <div class="control-panel compact-controls"><div class="panel-heading"><div><span class="eyebrow">05 / VIRTUAL MEMORY</span><h2>Page references</h2></div><span class="panel-index">PAGING</span></div><p class="panel-note">Step through a reference string and count page faults.</p><div class="field"><label for="pageFrames">Frame count</label><input type="number" id="pageFrames" value="3" min="1" max="10"></div><div class="field"><label for="pageRef">Reference string</label><input type="text" id="pageRef" value="7,0,1,2,0,3,0,4,2,3,0,3" aria-describedby="pageHelp"><small id="pageHelp">Comma-separated page numbers. Example: 7,0,1,2,0,3</small></div><div class="preset-row"><button class="text-button" onclick="document.getElementById('pageRef').value='7,0,1,2,0,3,0,4,2,3,0,3'">Use classic preset</button></div><div class="algorithm-chips"><button class="button button-secondary" onclick="runPage('fifo')">FIFO</button><button class="button button-secondary" onclick="runPage('lru')">LRU</button><button class="button button-secondary" onclick="runPage('optimal')">Optimal</button></div><button class="button button-accent-outline full-width" onclick="runPage('compare')">Compare all three →</button></div>
+            <div class="visual-column"><div class="visual-panel page-panel"><div class="visual-header"><div><span class="eyebrow">REFERENCE TRACE</span><h2 id="pageTitle">Frame table</h2></div><span class="visual-tag" id="pageStatus">AWAITING TRACE</span></div><div class="page-trace" id="pageTrace" role="region" aria-label="Page replacement frame table"><div class="chart-empty">Run FIFO, LRU, or Optimal to inspect the reference trace.</div></div><div class="metrics-strip"><div class="metric"><span>REFERENCES</span><strong id="pageReferenceCount">12</strong></div><div class="metric"><span>FAULTS</span><strong id="pageFaultCount">—</strong></div><div class="metric"><span>HIT RATIO</span><strong id="pageHitRatio">—</strong></div></div></div><div class="result-strip" id="pageResult"><div class="result-placeholder">TRACE STATUS <span>Hits and faults are marked after a run.</span></div></div></div>
+          </article>
+
+          <article class="module-view" id="view-disk" data-view="disk" hidden>
+            <div class="control-panel compact-controls"><div class="panel-heading"><div><span class="eyebrow">06 / STORAGE I/O</span><h2>Disk request queue</h2></div><span class="panel-index">0–199</span></div><p class="panel-note">Choose how the disk arm visits pending cylinders.</p><div class="field"><label for="diskHead">Initial head position</label><input type="number" id="diskHead" value="53" min="0" max="199"></div><div class="field"><label for="diskRequests">Request cylinders</label><input type="text" id="diskRequests" value="98,183,37,122,14,124,65,67" aria-describedby="diskHelp"><small id="diskHelp">Comma-separated cylinders from 0 to 199.</small></div><div class="preset-row"><button class="text-button" onclick="document.getElementById('diskHead').value='53';document.getElementById('diskRequests').value='98,183,37,122,14,124,65,67'">Load classic queue</button></div><div class="algorithm-chips"><button class="button button-secondary" onclick="runDisk('fcfs')">FCFS</button><button class="button button-secondary" onclick="runDisk('sstf')">SSTF</button><button class="button button-secondary" onclick="runDisk('scan')">SCAN</button><button class="button button-secondary" onclick="runDisk('cscan')">C-SCAN</button></div><button class="button button-accent-outline full-width" onclick="runDisk('compare')">Compare all →</button></div>
+            <div class="visual-column"><div class="visual-panel disk-panel"><div class="visual-header"><div><span class="eyebrow">HEAD MOVEMENT / CYLINDERS</span><h2 id="diskTitle">Seek path</h2></div><span class="visual-tag" id="diskStatus">AWAITING SCHEDULE</span></div><div class="disk-chart" id="diskChart" role="img" aria-label="Disk head movement chart"><div class="chart-empty">Run a disk scheduler to draw the seek path.</div></div><div class="metrics-strip"><div class="metric"><span>REQUESTS</span><strong id="diskRequestCount">08</strong></div><div class="metric"><span>SEEK DISTANCE</span><strong id="diskSeekDistance">—</strong></div><div class="metric"><span>ALGORITHM</span><strong id="diskAlgorithm">—</strong></div></div></div><div class="result-strip" id="diskResult"><div class="result-placeholder">DISK ACTIVITY <span>Seek order appears after a run.</span></div></div></div>
+          </article>
+        </section>
+
+        <aside class="process-drawer" aria-labelledby="processDrawerTitle"><div class="drawer-heading"><div><span class="eyebrow">KERNEL / PCB</span><h2 id="processDrawerTitle">Processes</h2></div><span class="count-pill" id="drawerProcessCount">0</span></div><div class="process-table-head"><span>PID / NAME</span><span>STATE</span><span>BT</span></div><div class="process-table" id="processTable" aria-live="polite"><div class="table-empty"><span>—</span><p>Process table is empty.</p><button class="text-button" onclick="loadSampleProcesses()">Load sample P1–P5</button></div></div><div class="drawer-footer"><span class="kernel-indicator"><i></i> SCHEDULER ONLINE</span><button class="text-button" onclick="runCommand('list')">↻</button></div></aside>
       </div>
+    </main>
+  </div>
 
-      <!-- Module 3: Memory Management -->
-      <div class="card">
-        <div class="card-header" onclick="toggleCard(this)">
-          <h2>Memory Management (1024 MB Arena)</h2>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="card-body">
-          <div class="form-row-grid-3">
-            <div class="form-group">
-              <label>Process</label>
-              <input type="text" id="memProcName" value="P1">
-            </div>
-            <div class="form-group">
-              <label>Size (MB)</label>
-              <input type="number" id="memSize" value="128" min="1" max="1024">
-            </div>
-            <div class="form-group">
-              <label>Policy</label>
-              <select id="memPolicy">
-                <option value="ff">First Fit (ff)</option>
-                <option value="bf">Best Fit (bf)</option>
-                <option value="wf">Worst Fit (wf)</option>
-              </select>
-            </div>
-          </div>
-          <div class="btn-group mt-2">
-            <button class="btn btn-primary" onclick="allocMemory()">Allocate Memory</button>
-            <button class="btn btn-outline" onclick="freeMemory()">Free Block</button>
-            <button class="btn btn-secondary" onclick="runCommand('mem_status')">Show Memory Map</button>
-            <button class="btn btn-danger-outline" onclick="runCommand('mem_reset')">Reset</button>
-          </div>
-        </div>
-      </div>
+  <section class="console-dock" id="consoleDock" aria-label="MiniOS terminal console">
+    <div class="dock-resize" id="dockResize" role="separator" aria-label="Resize terminal" aria-orientation="horizontal" tabindex="0"></div>
+    <div class="dock-header"><div class="dock-title"><span class="terminal-lamp"></span><strong>TERMINAL</strong><span class="dock-separator">/</span><span id="terminalTitle">MiniOS shell</span></div><div class="dock-tools"><span class="history-indicator" id="historyCount">HISTORY 00</span><button class="dock-tool" id="consoleToggle" aria-expanded="true">Collapse <span>⌄</span></button><button class="dock-tool" onclick="copyTerminalText()">Copy</button><button class="dock-tool" onclick="clearTerminal()">Clear</button></div></div>
+    <div class="terminal-body" id="terminalOutput" aria-live="polite"><div class="welcome-text">MiniOS kernel ready. Choose a module or enter a command to begin.</div></div>
+    <div class="terminal-input-bar"><span class="prompt-symbol">minios<span>&gt;</span></span><input type="text" id="cliInput" placeholder="Try ‘help’, ‘list’, or ‘schedule fcfs’" autocomplete="off" aria-label="Enter MiniOS command"><div class="completion-hint" id="completionHint" hidden></div><button class="button button-primary send-command" id="sendBtn" onclick="handleCliSend()">Run <kbd>↵</kbd></button></div>
+  </section>
 
-      <!-- Module 4: Synchronization & Deadlocks -->
-      <div class="card">
-        <div class="card-header" onclick="toggleCard(this)">
-          <h2>Process Synchronization & Deadlock</h2>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="card-body">
-          <div class="grid-buttons-2">
-            <button class="btn btn-module" onclick="runCommand('producer_consumer')">
-              <strong>Producer-Consumer</strong>
-              <small>Bounded-buffer with semaphores</small>
-            </button>
-            <button class="btn btn-module" onclick="runBankers()">
-              <strong>Banker's Algorithm</strong>
-              <small>Deadlock safety & safe sequence</small>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Module 5: Virtual Memory Page Replacement -->
-      <div class="card">
-        <div class="card-header" onclick="toggleCard(this)">
-          <h2>Virtual Memory: Page Replacement</h2>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="card-body">
-          <div class="form-row">
-            <div class="form-group" style="width: 85px;">
-              <label>Frames</label>
-              <input type="number" id="pageFrames" value="3" min="1" max="10">
-            </div>
-            <div class="form-group flex-1">
-              <label>Reference String</label>
-              <input type="text" id="pageRef" value="7,0,1,2,0,3,0,4,2,3,0,3">
-            </div>
-          </div>
-          <div class="btn-group mt-2">
-            <button class="btn btn-outline" onclick="runPage('fifo')">FIFO</button>
-            <button class="btn btn-outline" onclick="runPage('lru')">LRU</button>
-            <button class="btn btn-outline" onclick="runPage('optimal')">Optimal</button>
-            <button class="btn btn-success" onclick="runPage('compare')">Compare All 3</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Module 6: Disk Scheduling -->
-      <div class="card">
-        <div class="card-header" onclick="toggleCard(this)">
-          <h2>Disk Arm Scheduling</h2>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="card-body">
-          <div class="form-row">
-            <div class="form-group" style="width: 95px;">
-              <label>Initial Head</label>
-              <input type="number" id="diskHead" value="53" min="0" max="199">
-            </div>
-            <div class="form-group flex-1">
-              <label>Request Cylinders</label>
-              <input type="text" id="diskRequests" value="98,183,37,122,14,124,65,67">
-            </div>
-          </div>
-          <div class="btn-group mt-2">
-            <button class="btn btn-outline" onclick="runDisk('fcfs')">FCFS</button>
-            <button class="btn btn-outline" onclick="runDisk('sstf')">SSTF</button>
-            <button class="btn btn-outline" onclick="runDisk('scan')">SCAN</button>
-            <button class="btn btn-outline" onclick="runDisk('cscan')">C-SCAN</button>
-            <button class="btn btn-success" onclick="runDisk('compare')">Compare All</button>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- Right Column: Terminal Console Screen -->
-    <section class="terminal-panel">
-      <div class="terminal-card">
-        <div class="terminal-header">
-          <div class="terminal-header-left">
-            <span class="terminal-dot"></span>
-            <span class="terminal-title" id="terminalTitle">MiniOS Console (Terminal Output)</span>
-          </div>
-          <div class="terminal-actions">
-            <button class="btn-link" onclick="copyTerminalText()">Copy</button>
-            <span class="sep">|</span>
-            <button class="btn-link" onclick="clearTerminal()">Clear</button>
-          </div>
-        </div>
-        
-        <!-- Console Text Output -->
-        <div class="terminal-body" id="terminalOutput">
-          <div class="welcome-text">MiniOS Terminal ready. Click any action on the left or enter commands below.</div>
-        </div>
-
-        <!-- CLI Command Prompt Line -->
-        <div class="terminal-input-bar">
-          <span class="prompt-symbol">minios&gt;</span>
-          <input type="text" id="cliInput" placeholder="Type command (e.g. create P1 5 2, list, schedule rr 2)..." autocomplete="off">
-          <button class="btn btn-primary btn-sm" id="sendBtn" onclick="handleCliSend()">Send</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script src="app.js?v=2.0"></script>
+  <div class="command-palette-backdrop" id="paletteBackdrop" hidden><section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="paletteTitle"><div class="palette-search"><span>⌕</span><input id="paletteInput" type="search" placeholder="Jump to a module or action…" autocomplete="off"><kbd>ESC</kbd></div><h2 id="paletteTitle" class="eyebrow">NAVIGATION & ACTIONS</h2><div id="paletteItems" class="palette-items"><button data-command="nav:processes"><span>▦</span> Process management <kbd>1</kbd></button><button data-command="nav:cpu"><span>⌁</span> CPU scheduling <kbd>2</kbd></button><button data-command="nav:memory"><span>▤</span> Memory management <kbd>3</kbd></button><button data-command="nav:sync"><span>⇄</span> Synchronization <kbd>4</kbd></button><button data-command="nav:paging"><span>▥</span> Page replacement <kbd>5</kbd></button><button data-command="nav:disk"><span>◉</span> Disk scheduling <kbd>6</kbd></button><button data-command="action:demo"><span>▶</span> Run full demo <kbd>⌘↵</kbd></button><button data-command="action:console"><span>▱</span> Toggle terminal</button></div><div class="palette-footer">↑↓ TO NAVIGATE <span>↵ TO SELECT</span></div></section></div>
+  <div class="help-backdrop" id="helpBackdrop" hidden><section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle"><div class="dialog-heading"><div><span class="eyebrow">KEYBOARD REFERENCE</span><h2 id="helpTitle">Move around MiniOS</h2></div><button class="icon-button" id="closeHelp" aria-label="Close keyboard help">×</button></div><div class="shortcut-row"><span>Open command palette</span><kbd>⌘ K</kbd></div><div class="shortcut-row"><span>Run full demo</span><kbd>⌘ ↵</kbd></div><div class="shortcut-row"><span>Next/previous module</span><kbd>← / →</kbd></div><div class="shortcut-row"><span>Step schedule</span><kbd>Space</kbd></div><div class="shortcut-row"><span>Toggle terminal</span><kbd>⌘ J</kbd></div><p>Shortcuts work when focus is outside a text field.</p></section></div>
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+  <script src="app.js?v=4.0"></script>
 </body>
 </html>

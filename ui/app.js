@@ -57,16 +57,10 @@ function appendToTerminal(rawText, isUserInput = false, isStepBanner = false) {
 
 function setStatus(text, isBusy = false) {
   if (!statusBadge) return;
-  statusBadge.innerText = "Status: " + text;
-  if (isBusy) {
-    statusBadge.style.backgroundColor = "#fef3c7";
-    statusBadge.style.borderColor = "#fcd34d";
-    statusBadge.style.color = "#92400e";
-  } else {
-    statusBadge.style.backgroundColor = "#ecfdf5";
-    statusBadge.style.borderColor = "#a7f3d0";
-    statusBadge.style.color = "#065f46";
-  }
+  statusBadge.classList.toggle("is-busy", isBusy);
+  const label = statusBadge.querySelector("span:last-child");
+  if (label) label.textContent = "Status: " + text;
+  else statusBadge.textContent = "Status: " + text;
 }
 
 function sleep(ms) {
@@ -810,6 +804,7 @@ async function runCommand(cmd, timeoutSeconds = 6.0) {
         const data = await res.json();
         if (data.output) {
           appendToTerminal(data.output);
+          finishCommand(cleanCmd, data.output);
           return data.output;
         }
       } else {
@@ -823,11 +818,13 @@ async function runCommand(cmd, timeoutSeconds = 6.0) {
   // Standalone in-browser execution
   const out = StandaloneOS.executeCommand(cleanCmd);
   appendToTerminal(out);
-
-  if (!isDemoRunning) {
-    setStatus("System Ready", false);
-  }
+  finishCommand(cleanCmd, out);
   return out;
+}
+
+function finishCommand(command, output) {
+  if (!isDemoRunning) setStatus("System Ready", false);
+  if (typeof updateMiniOSViews === "function") updateMiniOSViews(command, output);
 }
 
 // Module 1 Actions
@@ -903,6 +900,7 @@ async function runBankers() {
         const data = await res.json();
         if (data.output) {
           appendToTerminal(data.output);
+          if (typeof renderBankers === "function") renderBankers(data.output);
           setStatus("System Ready", false);
           return;
         }
@@ -912,6 +910,7 @@ async function runBankers() {
 
   const out = StandaloneOS.bankers();
   appendToTerminal(out);
+  if (typeof renderBankers === "function") renderBankers(out);
   setStatus("System Ready", false);
 }
 
@@ -960,19 +959,23 @@ const demoSteps = [
   { label: "Disk Scheduling: Comparing FCFS vs SSTF vs SCAN vs C-SCAN (Head=53)", cmd: "disk compare 53 98,183,37,122,14,124,65,67" },
 ];
 
+function setDemoButton(running) {
+  fullDemoBtn.classList.toggle("button-danger-quiet", running);
+  fullDemoBtn.classList.toggle("button-primary", !running);
+  fullDemoBtn.innerHTML = running ? "Stop Demo" : 'Run Full Demo <kbd>⌘↵</kbd>';
+}
+
 async function toggleFullDemo() {
   if (isDemoRunning) {
     isDemoRunning = false;
-    fullDemoBtn.innerText = "Run Full Demo";
-    fullDemoBtn.className = "btn btn-primary";
+    setDemoButton(false);
     setStatus("Demo Stopped", false);
     appendToTerminal('<span class="ansi-yellow">[Demo stopped by user]</span>');
     return;
   }
 
   isDemoRunning = true;
-  fullDemoBtn.innerText = "Stop Demo";
-  fullDemoBtn.className = "btn btn-danger";
+  setDemoButton(true);
 
   appendToTerminal('<span class="ansi-cyan">========================================================================\nStarting MiniOS Automated Demonstration (24 Steps)\nExecuting operations sequentially...\n========================================================================</span>');
 
@@ -1004,16 +1007,14 @@ async function toggleFullDemo() {
   }
 
   isDemoRunning = false;
-  fullDemoBtn.innerText = "Run Full Demo";
-  fullDemoBtn.className = "btn btn-primary";
+  setDemoButton(false);
   if (terminalTitle) terminalTitle.innerText = "MiniOS Console (Terminal Output)";
 }
 
 async function resetSession() {
   if (isDemoRunning) {
     isDemoRunning = false;
-    fullDemoBtn.innerText = "Run Full Demo";
-    fullDemoBtn.className = "btn btn-primary";
+    setDemoButton(false);
   }
   setStatus("Restarting...", true);
 
@@ -1024,6 +1025,8 @@ async function resetSession() {
   }
   StandaloneOS.reset();
   appendToTerminal('<span class="ansi-yellow">[MiniOS session restarted]</span>');
+  if (typeof refreshProcessTable === "function") refreshProcessTable();
+  if (typeof setMemoryMap === "function") setMemoryMap(useLocalServer ? await localCommandOutput("mem_status") : StandaloneOS.memStatus());
   setStatus("Ready", false);
 }
 
@@ -1067,3 +1070,214 @@ cliInput.addEventListener("keydown", (e) => {
     }
   }
 });
+
+// ============================================================================
+// Mission Control presentation layer. This reads existing simulator output and
+// state; it does not implement or modify any OS algorithm.
+// ============================================================================
+const moduleMeta = {
+  processes: ["SYSTEM / PROCESS TABLE", "Process management", "Create processes and watch their state move through the system."],
+  cpu: ["SYSTEM / CPU SCHEDULER", "CPU scheduling", "Compare dispatch policies and inspect their execution timelines."],
+  memory: ["SYSTEM / MEMORY MANAGER", "Memory management", "Inspect allocation placement and free space across the 1024 MB arena."],
+  sync: ["SYSTEM / CONCURRENCY", "Synchronization", "Follow shared resource flow and check process safety."],
+  paging: ["SYSTEM / VIRTUAL MEMORY", "Page replacement", "Trace page references through the configured frame set."],
+  disk: ["SYSTEM / STORAGE I/O", "Disk scheduling", "See how scheduling policies move the disk head across cylinders."],
+};
+const processColors = ["#59d7c4", "#82b9ee", "#edbd73", "#c69be5", "#f18b88", "#87d9a9"];
+let activeModule = "processes";
+let ganttTimer = null;
+let ganttIndex = -1;
+let resizeStart = null;
+const $ = (id) => document.getElementById(id);
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const plainOutput = (value) => String(value || "").replace(/\x1b\[[0-9;]*m/g, "");
+function showToast(message) {
+  const region = $("toastRegion"); if (!region) return;
+  const item = document.createElement("div"); item.className = "toast"; item.textContent = message; region.appendChild(item);
+  setTimeout(() => item.remove(), 3200);
+}
+function navigateModule(name) {
+  if (!moduleMeta[name]) return;
+  activeModule = name;
+  document.querySelectorAll("[data-nav]").forEach((button) => {
+    const selected = button.dataset.nav === name;
+    button.classList.toggle("is-active", selected);
+    if (selected) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
+  });
+  document.querySelectorAll("[data-view]").forEach((view) => {
+    const selected = view.dataset.view === name;
+    view.hidden = !selected; view.classList.toggle("is-visible", selected);
+  });
+  const [eyebrow, title, description] = moduleMeta[name];
+  $("moduleEyebrow").textContent = eyebrow; $("moduleTitle").textContent = title; $("moduleDescription").textContent = description;
+  $("terminalTitle").textContent = `${title} / MiniOS shell`;
+  if (name === "processes") refreshProcessTable();
+}
+function colorFor(name) { let n = 0; for (const c of String(name)) n = (n * 31 + c.charCodeAt(0)) >>> 0; return processColors[n % processColors.length]; }
+function renderProcesses(rows) {
+  const table = $("processTable"); if (!table) return;
+  const processes = rows || [];
+  $("drawerProcessCount").textContent = String(processes.length);
+  $("metricProcessCount").textContent = String(processes.length).padStart(2, "0");
+  const ready = processes.filter((p) => /ready|new/i.test(p.state)).length;
+  const running = processes.filter((p) => /running/i.test(p.state)).length;
+  $("metricReadyCount").textContent = String(ready).padStart(2, "0");
+  $("metricRunningCount").textContent = String(running).padStart(2, "0");
+  $("processEmpty").hidden = processes.length > 0;
+  $("processActivity").hidden = processes.length === 0;
+  $("processActivity").innerHTML = processes.map((p) => `<div class="activity-row"><i class="activity-dot" style="background:${colorFor(p.name)}"></i><strong>${escapeHtml(p.name)}</strong><span>PID ${escapeHtml(p.pid)} · burst ${escapeHtml(p.burst)} ms</span><span class="activity-state">${escapeHtml(p.state)}</span></div>`).join("");
+  if (!processes.length) { table.innerHTML = '<div class="table-empty"><span>—</span><p>Process table is empty.</p><button class="text-button" onclick="loadSampleProcesses()">Load sample P1–P5</button></div>'; return; }
+  table.innerHTML = processes.map((p) => `<div class="process-row"><div class="process-name"><i class="process-color" style="--segment-color:${colorFor(p.name)};background:${colorFor(p.name)}"></i><span>${escapeHtml(p.pid)} / ${escapeHtml(p.name)}</span></div><span class="process-state">${escapeHtml(p.state)}</span><span class="process-burst">${escapeHtml(p.burst)}</span></div>`).join("");
+}
+function parseProcesses(text) {
+  return plainOutput(text).split("\n").map((line) => {
+    const m = line.match(/^\s*(\d+)\s+([\w-]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(READY|RUNNING|BLOCKED|WAITING|TERMINATED)\b/i);
+    return m ? {pid:m[1],name:m[2],burst:m[3],remaining:m[4],state:m[7].toUpperCase()} : null;
+  }).filter(Boolean);
+}
+async function localCommandOutput(command) {
+  try { const res = await fetch("/api/cmd", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command,timeout:4})}); if (!res.ok) return null; const data = await res.json(); return data.output || ""; } catch { return null; }
+}
+async function refreshProcessTable() {
+  if (!useLocalServer) { renderProcesses(StandaloneOS.processes); return; }
+  const output = await localCommandOutput("list");
+  if (output !== null) renderProcesses(parseProcesses(output));
+}
+function setResult(id, content) { const el = $(id); if (el) el.innerHTML = `<div class="result-content">${content}</div>`; }
+function parseGantt(output) {
+  const lines = plainOutput(output).split("\n");
+  const start = lines.findIndex((line) => /Gantt Chart:/i.test(line)); if (start < 0) return null;
+  const segmentLine = lines.slice(start + 1).find((line) => (line.match(/\|/g) || []).length >= 2 && /[A-Za-z]/.test(line));
+  if (!segmentLine) return null;
+  const names = segmentLine.split("|").map((s) => s.trim()).filter(Boolean);
+  const below = lines.slice(start + 1 + lines.slice(start + 1).indexOf(segmentLine));
+  let times = [];
+  for (const line of below.slice(1, 5)) { const nums = line.match(/\d+/g); if (nums && nums.length === names.length + 1) { times = nums.map(Number); break; } }
+  const source = StandaloneOS.processes;
+  const durations = names.map((name, i) => Math.max(1, times.length ? times[i + 1] - times[i] : (source.find((p) => p.name === name)?.burst || 1)));
+  return {names, times:times.length ? times : durations.reduce((a,d)=>{a.push(a[a.length-1]+d);return a;},[0]), durations};
+}
+function renderGantt(data) {
+  const root = $("ganttChart"); if (!data || !data.names.length) { root.innerHTML = '<div class="chart-empty">Run a scheduler to draw its execution timeline.</div>'; return; }
+  clearInterval(ganttTimer); ganttIndex = -1;
+  root.setAttribute("aria-label", `CPU execution timeline: ${data.names.join(", ")}`);
+  root.innerHTML = `<div class="gantt-track">${data.names.map((name,i)=>`<div class="gantt-segment" data-index="${i}" style="--duration:${data.durations[i]};--segment-color:${colorFor(name)}" title="${escapeHtml(name)} · ${data.times[i]}–${data.times[i+1]} ms">${escapeHtml(name)}<span class="gantt-time">${data.times[i]}</span>${i===data.names.length-1?`<span class="gantt-time">${data.times[i+1]}</span>`:""}</div>`).join("")}</div>`;
+  $("scheduleState").textContent = `${data.names.length} DISPATCHES`;
+  const output = window.__lastScheduleOutput || "";
+  const wt = output.match(/Average Waiting Time\s*:\s*([\d.]+)/i), tat = output.match(/Average Turnaround Time\s*:\s*([\d.]+)/i);
+  $("cpuResults").innerHTML = `<div class="metrics-strip" style="border:0;margin:0;padding:0"><div class="metric"><span>ALGORITHM</span><strong style="font-size:14px">${escapeHtml((output.match(/==========\s*(.*?)\s*Scheduling/i)||[])[1]||"SCHEDULE")}</strong></div><div class="metric"><span>AVG WAIT</span><strong>${wt?wt[1]:"—"}<small> ms</small></strong></div><div class="metric"><span>AVG TURNAROUND</span><strong>${tat?tat[1]:"—"}<small> ms</small></strong></div></div>`;
+  updatePlayback();
+}
+function updatePlayback() { const segments = [...document.querySelectorAll(".gantt-segment")]; segments.forEach((el,i)=>{el.classList.toggle("is-pending",i>ganttIndex);el.classList.toggle("is-current",i===ganttIndex)}); $("playbackLabel").textContent = `${Math.max(0,ganttIndex+1)} / ${segments.length} steps`; }
+function stepSchedule() { const count = document.querySelectorAll(".gantt-segment").length; if (!count) return; ganttIndex = (ganttIndex + 1) % count; updatePlayback(); }
+function setMemoryMap(output) {
+  const clean = plainOutput(output); const re = /\[\s*(\d+)\s*-\s*(\d+)\]\s+(\S+)\s+(\d+)\s+MB\s+(ALLOCATED|FREE)/g; const blocks=[]; let m;
+  while ((m=re.exec(clean))) blocks.push({start:+m[1],end:+m[2],name:m[3]==="---"?"":m[3],size:+m[4],allocated:m[5]==="ALLOCATED"});
+  if (!blocks.length) return;
+  const allocated=blocks.filter(b=>b.allocated).reduce((s,b)=>s+b.size,0), free=blocks.filter(b=>!b.allocated).reduce((s,b)=>s+b.size,0), holes=blocks.filter(b=>!b.allocated).map(b=>b.size), largest=Math.max(0,...holes), fragmentation=free?Math.round((1-largest/free)*100):0;
+  $("memoryUsageTag").textContent = `${Math.round(allocated/10.24)}% IN USE`;
+  $("processAllocated").innerHTML=`${allocated} <small>MB</small>`;
+  $("memoryAllocated").innerHTML=`${allocated} <small>MB</small>`; $("memoryFree").innerHTML=`${free} <small>MB</small>`; $("memoryFragmentation").innerHTML=`${fragmentation}<small>%</small>`;
+  $("memoryBar").innerHTML=blocks.map(b=>`<div class="memory-segment ${b.allocated?"allocated-segment":"free-segment"}" style="width:${b.size/10.24}%;--segment-color:${b.allocated?colorFor(b.name):"var(--faint)"}" title="${b.allocated?escapeHtml(b.name)+" allocated":"Free"}: ${b.size} MB, ${b.start}–${b.end} MB"><span>${b.allocated?escapeHtml(b.name):"FREE"} / ${b.size} MB</span></div>`).join("");
+  $("memoryLegend").innerHTML=blocks.filter(b=>b.allocated).map(b=>`<span><i style="--segment-color:${colorFor(b.name)}"></i>${escapeHtml(b.name)} · ${b.size} MB</span>`).join("")+`<span><i class="legend-free"></i>Free · ${free} MB</span>`;
+}
+function renderPage(output) {
+  const clean=plainOutput(output); const records=[]; const re=/^\s*(\d+)\s+\[\s*([^\]]+?)\s*\]\s+(HIT|FAULT)\s*$/gm; let m;
+  while((m=re.exec(clean))) records.push({ref:m[1],frames:m[2].split(",").map(x=>x.trim()),status:m[3]});
+  if(!records.length)return;
+  const frameCount=Math.max(...records.map(r=>r.frames.length));
+  $("pageTrace").innerHTML=`<table class="trace-table"><thead><tr><th>REF</th>${records.map((r,i)=>`<th>${escapeHtml(r.ref)}</th>`).join("")}</tr></thead><tbody>${Array.from({length:frameCount},(_,row)=>`<tr><th>F${row+1}</th>${records.map(r=>`<td class="${r.status.toLowerCase()}">${escapeHtml(r.frames[row]||"–")}</td>`).join("")}</tr>`).join("")}<tr><th>STATE</th>${records.map(r=>`<td class="${r.status.toLowerCase()}">${r.status==="HIT"?"H":"F"}</td>`).join("")}</tr></tbody></table>`;
+  const faults=(clean.match(/Total Page Faults:\s*(\d+)/i)||[])[1], ratio=(clean.match(/Hit Ratio:\s*([\d.]+%)/i)||[])[1];
+  $("pageTitle").textContent=`${(clean.match(/==========\s*(\w+)/)||[])[1]||"Page"} trace`; $("pageStatus").textContent=`${records.length} REFERENCES`; $("pageReferenceCount").textContent=records.length; $("pageFaultCount").textContent=faults||records.filter(r=>r.status==="FAULT").length; $("pageHitRatio").textContent=ratio||"—";
+  setResult("pageResult",`<strong>${escapeHtml($("pageFaultCount").textContent)} page faults</strong> · ${records.length} references · hits and faults shown in the frame trace.`);
+}
+function renderDisk(output) {
+  const clean=plainOutput(output), match=clean.match(/Seek Order:\s*([\d\s>\-]+)/i); if(!match)return;
+  const order=match[1].split(/\s*->\s*/).map(Number).filter(Number.isFinite), dist=(clean.match(/Total Seek Time:\s*(\d+)/i)||[])[1]; if(order.length<2)return;
+  const width=680,height=160,pad=35,x=i=>pad+i*(width-pad*2)/(order.length-1),y=v=>height-20-v/199*(height-45);
+  const points=order.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
+  $("diskChart").innerHTML=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Disk head seeks through cylinders ${order.join(", ")}"><line class="disk-axis" x1="${pad}" y1="${height-20}" x2="${width-pad}" y2="${height-20}"/><line class="disk-grid" x1="${pad}" y1="${y(100)}" x2="${width-pad}" y2="${y(100)}"/><polyline class="disk-path" points="${points}"/>${order.map((v,i)=>`<circle class="disk-point ${i===0?"first":""}" cx="${x(i)}" cy="${y(v)}" r="4"/><text class="disk-label ${i===0?"head":""}" x="${x(i)}" y="${y(v)-9}" text-anchor="middle">${v}</text>`).join("")}<text class="disk-label" x="${pad}" y="${height-3}">START</text><text class="disk-label" x="${width-pad}" y="${height-3}" text-anchor="end">SEEK ORDER →</text></svg>`;
+  $("diskTitle").textContent=`${order.length-1} head movements`; $("diskStatus").textContent="SCHEDULE COMPLETE"; $("diskRequestCount").textContent=Math.max(0,order.length-1); $("diskSeekDistance").textContent=dist||"—"; $("diskAlgorithm").textContent=(clean.match(/==========\s*(.*?)\s+Disk Scheduling/i)||[])[1]||"—";
+  setResult("diskResult",`<strong>Seek order</strong> · ${order.join(" → ")}<br><strong>Total movement</strong> · ${dist||"—"} cylinders`);
+}
+function renderBankers(output) {
+  const clean=plainOutput(output), match=clean.match(/Safe Sequence:\s*<\s*([^>]+)\s*>/i); if(!match)return;
+  const sequence=match[1].split(/\s*->\s*/);
+  $("syncTitle").textContent="Banker’s safety sequence"; $("syncStatus").textContent=/SAFE state/i.test(clean)?"SAFE STATE":"CHECK COMPLETE";
+  $("syncVisual").innerHTML=`<div class="safe-sequence">${sequence.map((p,i)=>`${i?'<span class="safe-arrow">→</span>':''}<span class="safe-node">${escapeHtml(p)}</span>`).join("")}</div>`;
+  $("syncMetrics").innerHTML=`<div><span>PROCESSES</span><strong>${sequence.length}</strong></div><div><span>STATE</span><strong>${/SAFE state/i.test(clean)?"SAFE":"CHECK"}</strong></div><div><span>SEQUENCE</span><strong>VALID</strong></div>`;
+  setResult("syncResult",`<strong>${/SAFE state/i.test(clean)?"Safe state":"Safety check complete"}</strong> · ${sequence.join(" → ")}`);
+}
+function renderProducerConsumer(output) {
+  const clean=plainOutput(output); if(!/Producer-Consumer Problem/.test(clean))return;
+  const last=clean.match(/\d+\s+\w+\s+\d+\s+\d+\s+1\s+\[([^\]]+)\]/g)?.slice(-1)[0];
+  const slots=last?last.match(/\[([^\]]+)\]/)[1].split(","):[];
+  $("syncTitle").textContent="Producer–Consumer buffer"; $("syncStatus").textContent="10 STEPS COMPLETE";
+  $("syncVisual").innerHTML=`<div class="sync-empty"><div class="sync-flow"><span>PRODUCER</span><b>→</b>${slots.map(v=>`<span class="buffer-slot">${v==="_"?"□":escapeHtml(v)}</span>`).join("")}<b>→</b><span>CONSUMER</span></div><p>Final buffer state from the simulation trace.</p></div>`;
+  const lastline=clean.trim().split("\n").filter(line=>/\d+\s+\w+\s+\d+\s+\d+\s+1\s+\[/.test(line)).pop()||""; const nums=lastline.match(/\d+/g)||[];
+  $("syncMetrics").innerHTML=`<div><span>EMPTY</span><strong>${nums[1]||"—"}</strong></div><div><span>FULL</span><strong>${nums[2]||"—"}</strong></div><div><span>MUTEX</span><strong>1</strong></div>`;
+  setResult("syncResult","<strong>Producer–Consumer simulation complete</strong> · bounded buffer state summarized from terminal output.");
+}
+function updateMiniOSViews(command, output) {
+  const cmd=command.toLowerCase(), clean=plainOutput(output);
+  $("historyCount").textContent=`HISTORY ${String(cmdHistory.length).padStart(2,"0")}`;
+  if (/^(create|kill|clear_all|list)\b/.test(cmd)) refreshProcessTable();
+  if (/^schedule\s+/.test(cmd) && !/compare/.test(cmd)) {
+    window.__lastScheduleOutput=clean; const data=parseGantt(clean); if(data) renderGantt(data);
+  }
+  if (/^mem_(alloc|free|reset|status)\b/.test(cmd)) {
+    if (/^mem_status\b/.test(cmd)) setMemoryMap(clean);
+    else if (useLocalServer) localCommandOutput("mem_status").then(setMemoryMap);
+    else setMemoryMap(StandaloneOS.memStatus());
+    setResult("memoryResult",escapeHtml(clean.trim()));
+  }
+  if (/^page\s+/.test(cmd) && !/compare/.test(cmd)) renderPage(clean);
+  if (/^disk\s+/.test(cmd) && !/compare/.test(cmd)) renderDisk(clean);
+  if (/^bankers\b/.test(cmd)) renderBankers(clean);
+  if (/^producer_consumer\b/.test(cmd)) renderProducerConsumer(clean);
+}
+
+// Navigation and responsive controls
+const navButtons=[...document.querySelectorAll(".rail-item[data-nav]")];
+navButtons.forEach((button,index)=>button.addEventListener("click",()=>navigateModule(button.dataset.nav)));
+document.querySelectorAll("[data-nav].brand").forEach(el=>el.addEventListener("click",e=>{e.preventDefault();navigateModule("processes")}));
+$("themeToggle").addEventListener("click",()=>{const next=document.documentElement.dataset.theme==="dark"?"light":"dark";document.documentElement.dataset.theme=next;localStorage.setItem("minios-theme",next);$("themeToggle").setAttribute("aria-label",`Switch to ${next==="dark"?"light":"dark"} theme`)});
+const savedTheme=localStorage.getItem("minios-theme"); if(savedTheme)document.documentElement.dataset.theme=savedTheme;
+$("consoleToggle").addEventListener("click",()=>{const dock=$("consoleDock"), collapsed=dock.classList.toggle("is-collapsed");$("consoleToggle").innerHTML=collapsed?'Expand <span>⌃</span>':'Collapse <span>⌄</span>';$("consoleToggle").setAttribute("aria-expanded",String(!collapsed))});
+$("dockResize").addEventListener("pointerdown",e=>{resizeStart={y:e.clientY,height:$("consoleDock").getBoundingClientRect().height};e.currentTarget.setPointerCapture(e.pointerId)});
+$("dockResize").addEventListener("pointermove",e=>{if(!resizeStart)return;const height=Math.max(140,Math.min(innerHeight*.7,resizeStart.height+resizeStart.y-e.clientY));$("consoleDock").style.height=`${height}px`});
+$("dockResize").addEventListener("pointerup",()=>resizeStart=null);
+$("dockResize").addEventListener("keydown",e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();const d=$("consoleDock"), delta=e.key==="ArrowUp"?24:-24;d.style.height=`${Math.max(140,Math.min(innerHeight*.7,d.getBoundingClientRect().height+delta))}px`}});
+$("playSchedule").addEventListener("click",()=>{if(ganttTimer){clearInterval(ganttTimer);ganttTimer=null;$("playSchedule").textContent="▶";return}if(!document.querySelector(".gantt-segment"))return;if(ganttIndex>=document.querySelectorAll(".gantt-segment").length-1)ganttIndex=-1;$("playSchedule").textContent="Ⅱ";const speed=Number($("playbackSpeed").value)||1;ganttTimer=setInterval(()=>{if(ganttIndex>=document.querySelectorAll(".gantt-segment").length-1){clearInterval(ganttTimer);ganttTimer=null;$("playSchedule").textContent="▶";return}stepSchedule()},700/speed)});
+$("stepSchedule").addEventListener("click",stepSchedule);
+
+// Command palette
+const palette=$("paletteBackdrop"), paletteInput=$("paletteInput"), paletteList=$("paletteItems");
+function openPalette(){palette.hidden=false;paletteInput.value="";filterPalette();paletteInput.focus()}
+function closePalette(){palette.hidden=true;$("paletteTrigger").focus()}
+function filterPalette(){const query=paletteInput.value.trim().toLowerCase();paletteList.querySelectorAll("button").forEach(b=>{b.hidden=!b.textContent.toLowerCase().includes(query);b.classList.remove("is-selected")});const first=paletteList.querySelector("button:not([hidden])");if(first)first.classList.add("is-selected")}
+$("paletteTrigger").addEventListener("click",openPalette);paletteInput.addEventListener("input",filterPalette);
+palette.addEventListener("click",e=>{if(e.target===palette)closePalette()});
+paletteList.addEventListener("click",e=>{const b=e.target.closest("button[data-command]");if(!b)return;const [kind,arg]=b.dataset.command.split(":");closePalette();if(kind==="nav")navigateModule(arg);else if(arg==="demo")toggleFullDemo();else if(arg==="console")$("consoleToggle").click()});
+paletteInput.addEventListener("keydown",e=>{const buttons=[...paletteList.querySelectorAll("button:not([hidden])")],index=buttons.indexOf(paletteList.querySelector(".is-selected"));if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();buttons.forEach(b=>b.classList.remove("is-selected"));if(buttons.length)buttons[(index+(e.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length].classList.add("is-selected")}else if(e.key==="Enter"){e.preventDefault();(paletteList.querySelector(".is-selected")||buttons[0])?.click()}else if(e.key==="Escape")closePalette()});
+$("helpTrigger").addEventListener("click",()=>$("helpBackdrop").hidden=false);$("closeHelp").addEventListener("click",()=>$("helpBackdrop").hidden=true);$("helpBackdrop").addEventListener("click",e=>{if(e.target===$("helpBackdrop"))$("helpBackdrop").hidden=true});
+document.addEventListener("keydown",e=>{const editing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openPalette()}else if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="j"){e.preventDefault();$("consoleToggle").click()}else if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){e.preventDefault();toggleFullDemo()}else if(e.key==="Escape"){if(!palette.hidden)closePalette();$("helpBackdrop").hidden=true}else if(!editing&&e.key==="?"){$("helpBackdrop").hidden=false}else if(!editing&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){const i=Object.keys(moduleMeta).indexOf(activeModule);navigateModule(Object.keys(moduleMeta)[(i+(e.key==="ArrowRight"?1:-1)+6)%6])}else if(!editing&&e.code==="Space"&&activeModule==="cpu"){e.preventDefault();stepSchedule()}});
+
+// Command hints and Tab completion
+const knownCommands=["help","list","clear_all","create","kill","schedule fcfs","schedule sjf","schedule rr","schedule priority","schedule mlfq","schedule compare","mem_alloc","mem_free","mem_status","mem_reset","producer_consumer","bankers","page fifo","page lru","page optimal","page compare","disk fcfs","disk sstf","disk scan","disk cscan","disk compare"];
+function updateCompletion(){const value=cliInput.value.trim().toLowerCase(), hint=$("completionHint");if(!value){hint.hidden=true;return}const matches=knownCommands.filter(c=>c.startsWith(value));hint.hidden=!matches.length;hint.textContent=matches.slice(0,3).join("   ·   ")}
+cliInput.addEventListener("input",updateCompletion);
+cliInput.addEventListener("keydown",e=>{if(e.key==="Tab"){const value=cliInput.value.trim().toLowerCase(),match=knownCommands.find(c=>c.startsWith(value));if(match){e.preventDefault();cliInput.value=match+" ";updateCompletion()}}});
+
+// Boot transition and first-use guided tour
+function dismissBoot(){setTimeout(()=>$("bootScreen").classList.add("is-done"),420)}
+if(useLocalServer){fetch("/health").then(r=>{if(!r.ok)throw Error("health");$("bootMessage").textContent="Kernel ready"}).catch(()=>{$("bootMessage").textContent="Starting local simulator"}).finally(dismissBoot)}else{$("bootMessage").textContent="Standalone simulator ready";dismissBoot()}
+setInterval(()=>{$("clockReadout").textContent=new Date().toLocaleTimeString([], {hour12:false})},1000);$("clockReadout").textContent=new Date().toLocaleTimeString([], {hour12:false});
+if(useLocalServer) refreshProcessTable(); else renderProcesses(StandaloneOS.processes);
+if(useLocalServer) localCommandOutput("mem_status").then(setMemoryMap); else setMemoryMap(StandaloneOS.memStatus());
+if(!localStorage.getItem("minios-tour-seen"))setTimeout(()=>{
+  let step=0;const tour=["Welcome to MiniOS Mission Control. Start in the process table and load sample jobs.","Choose CPU, memory, sync, paging, or disk from the module rail.","Visual timelines and state maps appear beside each module’s controls.","The terminal stays available below. Use ⌘K to jump to any module."];
+  const region=$("toastRegion"),dialog=document.createElement("div");dialog.className="tour-card";dialog.setAttribute("role","dialog");dialog.setAttribute("aria-live","polite");document.body.appendChild(dialog);
+  const draw=()=>{dialog.innerHTML=`<span class="eyebrow">QUICK TOUR · ${step+1} / ${tour.length}</span><p>${tour[step]}</p><div><button class="text-button" data-tour-skip>Skip</button><button class="button button-primary" data-tour-next>${step===tour.length-1?"Finish":"Next"}</button></div>`};
+  const done=()=>{dialog.remove();localStorage.setItem("minios-tour-seen","1")};dialog.addEventListener("click",e=>{if(e.target.closest("[data-tour-skip]"))done();else if(e.target.closest("[data-tour-next]")){step++;if(step===tour.length)done();else draw()}});draw();
+},900);

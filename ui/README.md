@@ -1,57 +1,40 @@
-# MiniOS Web UI Dashboard
+# MiniOS Mission Control
 
-An interactive browser-based dashboard for testing and visualizing all MiniOS operating system modules without manually typing terminal commands.
+The MiniOS browser UI presents the existing operating systems simulator as a focused, responsive workspace. It keeps process management, CPU scheduling, memory allocation, synchronization, paging, disk scheduling, and the command terminal available through one consistent shell.
 
----
+## Run locally
 
-## 🚀 How to Run the UI
-
-### Step 1: Start the UI Server
-Open a terminal in the project directory and run:
+From the repository root:
 
 ```bash
 python3 ui/app.py
 ```
 
-*(Zero external dependencies required — runs using Python's standard library).*
+Open [http://127.0.0.1:5050](http://127.0.0.1:5050). The Python bridge uses the standard library. When the backend is unavailable, the page falls back to its existing in-browser simulator.
 
-### Step 2: Open in Browser
-Visit the following URL in Google Chrome, Safari, Firefox, or Edge:
+## Workspace
 
-👉 **[http://127.0.0.1:5050](http://127.0.0.1:5050)**
+- **Processes:** create jobs, load sample processes, inspect state, and terminate by PID.
+- **CPU scheduling:** run FCFS, SJF, Priority, MLFQ, or Round Robin, then play or step through the Gantt timeline.
+- **Memory:** allocate/free blocks and inspect the memory map and free-space fragmentation.
+- **Synchronization:** inspect the bounded-buffer trace or Banker’s safe sequence.
+- **Paging:** trace frame contents and hits/faults for FIFO, LRU, or Optimal.
+- **Disk:** view head movement and total seek distance for FCFS, SSTF, SCAN, and C-SCAN.
+- **Terminal:** run existing MiniOS CLI commands, recall history with ↑/↓, and use Tab for command completion.
 
----
+The terminal remains the complete command output. The charts summarize output returned by the simulator and do not replace the algorithms.
 
-## 🎯 Features in the UI
+## Keyboard shortcuts
 
-1. **Process Management**:
-   - Add custom processes with Burst Time, Priority, and Arrival Time.
-   - One-click button to load 5 standard textbook processes (`P1` to `P5`).
-   - View process table and terminate processes by PID.
+| Shortcut | Action |
+| --- | --- |
+| `⌘/Ctrl + K` | Open the command palette |
+| `⌘/Ctrl + Enter` | Run the full demonstration |
+| `⌘/Ctrl + J` | Collapse or expand the terminal |
+| `← / →` | Move between modules when focus is outside a field |
+| `Space` | Step the CPU timeline when focus is outside a field |
+| `?` | Open shortcut help |
 
-2. **CPU Scheduling**:
-   - One-click execution for **FCFS**, **SJF**, **Priority**, and **MLFQ** with Gantt charts.
-   - Configurable quantum for **Round Robin**.
-   - **Compare All Schedulers** button with side-by-side performance table.
+## Design and implementation
 
-3. **Memory Management (1024 MB Arena)**:
-   - Dynamic memory allocation with **First Fit (ff)**, **Best Fit (bf)**, and **Worst Fit (wf)**.
-   - Free allocated blocks and automatically merge adjacent free memory.
-   - Live visual memory map inspection.
-
-4. **Process Synchronization & Deadlocks**:
-   - Step-by-step **Producer-Consumer** bounded buffer simulation with semaphores.
-   - Interactive **Banker's Algorithm** demonstrating resource safety algorithm and safe sequence.
-
-5. **Page Replacement**:
-   - Compare **FIFO**, **LRU**, and **Optimal** page replacement algorithms with custom frames and reference strings.
-
-6. **Disk Scheduling**:
-   - Simulate **FCFS**, **SSTF**, **SCAN (Elevator)**, and **C-SCAN** with custom head positions and request queues.
-
-7. **Interactive Live Console**:
-   - Real-time ANSI color output screen.
-   - Built-in command line bar with command history (Up/Down arrow keys).
-   - "Copy Output" and "Clear Screen" buttons.
-   - "Run Full Demo" button to run the entire OS test suite in 5 seconds.
-
+See [`../DESIGN.md`](../DESIGN.md) for the experience audit, interaction model, design tokens, layout sketch, accessibility choices, and implementation boundaries. The UI adds no JavaScript package dependencies. The simulator commands, API, algorithms, C modules, Python bridge, and CLI remain the sources of behavior.

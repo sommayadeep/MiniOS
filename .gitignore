@@ -1,19 +1,5 @@
-# Compiled binary
+node_modules/
+dist/
+*.tsbuildinfo
 minios
-minios.exe
-*.o
-*.out
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor files
-*.swp
-*.swo
-*~
-.vscode/
-
-# PDF and PPT files (course materials - not part of project)
-*.pdf
-*.pptx
+__pycache__/

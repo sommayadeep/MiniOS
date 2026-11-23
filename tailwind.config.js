@@ -1,0 +1,1 @@
+export default {darkMode:'class',content:['./index.html','./src/**/*.{ts,tsx}'],theme:{extend:{colors:{ink:'#101716',panel:'#18211f',edge:'#2a3935',signal:'#64d8bd',ready:'#82d5a5',waiting:'#e9bd70',error:'#ed827b'},fontFamily:{display:['Space Grotesk'],sans:['Geist Sans'],mono:['JetBrains Mono']},borderRadius:{panel:'7px'},boxShadow:{active:'0 0 18px #64d8bd25'}}},plugins:[]};
