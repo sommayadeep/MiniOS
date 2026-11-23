@@ -60,6 +60,8 @@ Then open your browser at: **[http://127.0.0.1:5050](http://127.0.0.1:5050)**
 
 The repository includes a Dockerfile and Render Blueprint for an always-on Render web service. In Render, create a Blueprint from this repository and apply `render.yaml`; the `starter` plan is paid and does not spin down. Render will assign a public `onrender.com` URL. See [Render's compute plans](https://render.com/docs/compute-plans) for current pricing.
 
+For a free Oracle Cloud Always Free VM deployment, follow [ORACLE_DEPLOY.md](ORACLE_DEPLOY.md). Check that the VM shape and all selected resources are marked Always Free eligible in your account before creating them.
+
 ## Project Structure
 
 ```

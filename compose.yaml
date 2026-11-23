@@ -1,0 +1,7 @@
+services:
+  minios:
+    build: .
+    container_name: minios
+    restart: unless-stopped
+    ports:
+      - "80:5050"
