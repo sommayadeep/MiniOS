@@ -2,7 +2,8 @@ name: Render Keep-Alive
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Offset away from minute 0 to reduce GitHub Actions queue delays.
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
 
 jobs:
