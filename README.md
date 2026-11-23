@@ -62,6 +62,16 @@ The repository includes a Dockerfile and Render Blueprint for an always-on Rende
 
 For a free Oracle Cloud Always Free VM deployment, follow [ORACLE_DEPLOY.md](ORACLE_DEPLOY.md). Check that the VM shape and all selected resources are marked Always Free eligible in your account before creating them.
 
+### Render presentation keep-alive
+
+The optional GitHub Actions workflow at `.github/workflows/render-keepalive.yml` requests the Render service's `/health` endpoint every 10 minutes. To configure it:
+
+1. In the GitHub repository, open **Settings → Secrets and variables → Actions → New repository secret**.
+2. Set the name to `RENDER_SERVICE_URL` and the value to the Render service's base URL, such as `https://minios-example.onrender.com` (do not append `/health`).
+3. Open **Actions → Render Keep-Alive** and enable workflows if GitHub prompts you. Use **Run workflow** to trigger a manual check.
+
+To stop scheduled pings after the presentation, disable the workflow from its **Actions** page or delete `.github/workflows/render-keepalive.yml`. You can also remove the `RENDER_SERVICE_URL` repository secret when it is no longer needed; manual and scheduled runs will then fail with a clear configuration message.
+
 ## Project Structure
 
 ```

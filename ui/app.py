@@ -141,6 +141,25 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
+    def do_GET(self):
+        parsed = urlparse(self.path)
+
+        if parsed.path == "/health":
+            payload = {
+                "status": "ok",
+                "service": "MiniOS",
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        super().do_GET()
+
     def do_POST(self):
         parsed = urlparse(self.path)
 

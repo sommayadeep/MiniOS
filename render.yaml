@@ -3,4 +3,4 @@ services:
     name: minios
     runtime: docker
     plan: starter
-    healthCheckPath: /
+    healthCheckPath: /health
